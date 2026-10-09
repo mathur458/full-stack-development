@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Result Management</title>
+</head>
+<body>
+
+  <header>
+    <h1>Student Portal</h1>
+    <nav>
+      <a href="#registration">Registration</a>
+      <a href="#result">Result</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Registration form -->
+    <section id="registration">
+      <h2>Student Registration</h2>
+      <form id="studentForm" novalidate>
+        <div class="grid">
+          <div class="field">
+            <label for="name">Student Name</label>
+            <input type="text" id="name" placeholder="Enter name">
+            <span class="error" id="nameErr"></span>
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="Enter email">
+            <span class="error" id="emailErr"></span>
+          </div>
+          <div class="field">
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" placeholder="10 digit phone number" maxlength="10">
+            <span class="error" id="phoneErr"></span>
+          </div>
+          <div class="field">
+            <label for="course">Course</label>
+            <select id="course">
+              <option>B Tech CSE</option>
+              <option>B Tech IT</option>
+              <option>BCA</option>
+              <option>MCA</option>
+            </select>
+            <span class="error"></span>
+          </div>
+          <div class="field">
+            <label for="html">HTML Marks</label>
+            <input type="number" id="html" placeholder="0 - 100">
+            <span class="error" id="htmlErr"></span>
+          </div>
+          <div class="field">
+            <label for="css">CSS Marks</label>
+            <input type="number" id="css" placeholder="0 - 100">
+            <span class="error" id="cssErr"></span>
+          </div>
+          <div class="field">
+            <label for="js">JavaScript Marks</label>
+            <input type="number" id="js" placeholder="0 - 100">
+            <span class="error" id="jsErr"></span>
+          </div>
+        </div>
+        <button type="submit">Generate Result</button>
+        <button type="button" class="secondary" id="resetBtn">Reset</button>
+      </form>
+    </section>
+
+    <!-- Result -->
+    <section id="result">
+      <h2>Result</h2>
+      <div id="output"><p>No result generated yet.</p></div>
+    </section>
+
+  </main>
+
+  <script>
+    var STORAGE_KEY = "students";
+    var PASS_MARK = 40;   // minimum marks per subject and minimum overall percentage
+
+    var form = document.getElementById("studentForm");
+
+    // ---------- helpers ----------
+    function val(id) { return document.getElementById(id).value.trim(); }
+
+    function setError(id, msg) {
+      document.getElementById(id + "Err").textContent = msg;
+      document.getElementById(id).classList.toggle("invalid", msg !== "");
+      return msg === "";
+    }
+
+    function esc(text) {
+      var d = document.createElement("div");
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    // ---------- validation ----------
+    function validateMarks(id, label) {
+      var v = val(id);
+      if (v === "") return setError(id, label + " is required");
+      var n = Number(v);
+      if (isNaN(n) || n < 0 || n > 100) return setError(id, "Enter marks between 0 and 100");
+      return setError(id, "");
+    }
+
+    function validate() {
+      var ok = true;
+
+      if (!/^[A-Za-z ]{3,}$/.test(val("name")))
+        ok = setError("name", "Name must have at least 3 letters (letters only)") && ok;
+      else setError("name", "");
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val("email")))
+        ok = setError("email", "Enter a valid email address") && ok;
+      else setError("email", "");
+
+      if (!/^[6-9][0-9]{9}$/.test(val("phone")))
+        ok = setError("phone", "Enter a valid 10 digit phone number") && ok;
+      else setError("phone", "");
+
+      ok = validateMarks("html", "HTML marks") && ok;
+      ok = validateMarks("css", "CSS marks") && ok;
+      ok = validateMarks("js", "JavaScript marks") && ok;
+
+      return ok;
+    }
+
+    // ---------- calculation ----------
+    function buildStudent() {
+      var html = Number(val("html"));
+      var css = Number(val("css"));
+      var js = Number(val("js"));
+      var total = html + css + js;
+      var percentage = (total / 300) * 100;
+      var passed = html >= PASS_MARK && css >= PASS_MARK && js >= PASS_MARK;
+
+      return {
+        name: val("name"),
+        email: val("email"),
+        phone: val("phone"),
+        course: document.getElementById("course").value,
+        marks: { html: html, css: css, js: js },
+        total: total,
+        percentage: Number(percentage.toFixed(2)),
+        result: passed ? "Pass" : "Fail"
+      };
+    }
+
+    // ---------- display ----------
+    function showResult(s) {
+      var cls = s.result === "Pass" ? "pass" : "fail";
+      document.getElementById("output").innerHTML =
+        '<div class="result-row">' +
+          '<span><b>Name:</b> ' + esc(s.name) + '</span>' +
+          '<span><b>Email:</b> ' + esc(s.email) + '</span>' +
+          '<span><b>Phone:</b> ' + esc(s.phone) + '</span>' +
+          '<span><b>Course:</b> ' + esc(s.course) + '</span>' +
+        '</div>' +
+        '<div class="result-row">' +
+          '<span><b>HTML:</b> ' + s.marks.html + '</span>' +
+          '<span><b>CSS:</b> ' + s.marks.css + '</span>' +
+          '<span><b>JavaScript:</b> ' + s.marks.js + '</span>' +
+        '</div>' +
+        '<div class="result-row">' +
+          '<span><b>Total:</b> ' + s.total + ' / 300</span>' +
+          '<span><b>Percentage:</b> ' + s.percentage + '%</span>' +
+        '</div>' +
+        '<span class="badge ' + cls + '">' + s.result + '</span>';
+    }
+
+    // ---------- local storage (JSON) ----------
+    function getRecords() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveStudent(student) {
+      var records = getRecords();
+      records.push(student);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));  // object -> JSON string
+      } catch (e) {
+        alert("Could not save to Local Storage.");
+      }
+    }
+
+
+    // ---------- events ----------
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!validate()) return;
+
+      var student = buildStudent();
+      showResult(student);
+      saveStudent(student);
+      document.getElementById("result").scrollIntoView({ behavior: "smooth" });
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      form.reset();
+      ["name", "email", "phone", "html", "css", "js"].forEach(function (id) { setError(id, ""); });
+      document.getElementById("output").innerHTML = "<p>No result generated yet.</p>";
+    });
+
+
+  </script>
+
+</body>
+</html>
